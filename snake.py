@@ -1,127 +1,96 @@
 """
 Snake game with autopilot option
 @author Juha Reinikainen
-@date 24.12.2020 
+@date 24.12.2020
 """
 
 import pygame as pg
 import random
 import math
+from typing import Tuple
 
 
-class Snake:
-    def __init__(self):
-        self.x = 100
-        self.y = 100
-        self.snakeSize = 25
-        self.backGroundColor = (255, 255, 255)
-        self.snakeColor = (79, 204, 67)
-        self.foodColor = (250, 237, 0)
-        self.controlBoxColor = (0,0,0)
-        self.autopilotButtonColor = (71, 71, 71)
-        self.controlBoxTextColor = (255,255,255)
-        self.controlBoxHeight = 50
-        self.screenW = 500
-        self.screenH = 500
+class Constants:
+    SNAKE_SIZE = 25
+    SPEED = 25
+    FOOD_SIZE = 30
 
-        self.autopilot = False
+    BACKGROUND_COLOR = (255, 255, 255)
+    SNAKE_COLOR = (79, 204, 67)
+    FOOD_COLOR = (250, 237, 0)
+    CONTROL_BOX_COLOR = (0, 0, 0)
+    AUTOPILOT_BUTTON_COLOR = (71, 71, 71)
+    CONTROLBOX_TEXT_COLOR = (255, 255, 255)
+    CONTROLBOX_HEIGHT = 50
+    SCREEN_W = 500
+    SCREEN_H = 500
 
-        self.snake = [
-            pg.Rect(self.x, self.y, self.snakeSize, self.snakeSize)
-        ]
-        self.window = None
-        self.running = True
-        self.speed = self.snakeSize
-        self.dy = 0
-        self.dx = self.speed
+    STEPS_TO_TAKE = 4
 
-        self.foodSize = 30
-        self.food = pg.Rect(50, 50, self.foodSize, self.foodSize)
+class State:
+    def __init__(self, x, y, dx, dy, running, autopilot, snake, food):
+        self.x = x
+        self.y = y
+        self.dy = dx
+        self.dx = dy
+        self.running = running
+        self.autopilot = autopilot
+        self.snake = snake
+        self.food = food
 
-    def processInput(self):
-        for event in pg.event.get():
-            if event.type == pg.QUIT or (event.type == pg.KEYDOWN and event.key == pg.K_ESCAPE):
-                self.running = False
-                break
-            elif not self.autopilot and event.type == pg.KEYDOWN:
-                if event.key == pg.K_RIGHT:
-                    self.dx = self.speed
-                    self.dy = 0
-                elif event.key == pg.K_LEFT:
-                    self.dx = -self.speed
-                    self.dy = 0
-                elif event.key == pg.K_DOWN:
-                    self.dy = self.speed
-                    self.dx = 0
-                elif event.key == pg.K_UP:
-                    self.dy = -self.speed
-                    self.dx = 0
-            elif event.type == pg.MOUSEBUTTONDOWN:
-                x, y = pg.mouse.get_pos()
-                if self.autopilotButton.collidepoint(x, y):
-                    if self.autopilot:
-                        self.autopilot = False
-                    else:
-                        self.autopilot = True
+    def copy(self):
+        return State(
+            self.x, self.y,
+            self.dx, self.dy,
+            self.running, self.autopilot,
+            [rect.copy() for rect in self.snake],
+            self.food.copy()
+        )
 
-    def initialize(self):
-        pg.init()
-        pg.display.set_caption("Snake game")
-
-        self.window = pg.display.set_mode((self.screenW, self.screenH + self.controlBoxHeight))
-        pg.draw.rect(self.window, self.backGroundColor, (0, 0, self.screenW, self.screenH))
-
-        font = pg.font.SysFont(None, 24)
-        img = font.render("Autopilot", True, self.controlBoxTextColor)
-
-        controlBoxRec = (0, self.screenH, self.screenW, self.controlBoxHeight)
-        pg.draw.rect(self.window, self.controlBoxColor, controlBoxRec)
-        self.autopilotButton = pg.draw.rect(
-            self.window, self.autopilotButtonColor, (0, self.screenH, img.get_width(), self.controlBoxHeight))
-        
-        self.window.blit(img, (0, self.screenH + self.controlBoxHeight // 2 - 12))
-        
-        pg.display.flip()
-
-    def update(self):
+    def update(self, window: pg.Surface, virtual: bool):
         """
         Moves snake one step towards its direction
         Moves food if eaten
         Grows snake if eats food
         Checks if head touches tail
+        Params: 
+            window: Surface
+            virtual: whether to update window
         Returns:
-            List[Rect] parts of the screen that need to be repainted
+            (List[Rect], grow) parts of the screen that need to be repainted
+            and boolean flag indicating if snake has grown
         """
+        self.x = (self.x + self.dx) % Constants.SCREEN_W
+        self.y = (self.y + self.dy) % Constants.SCREEN_H
+
         self.snake.append(
-            pg.Rect(self.x, self.y, self.snakeSize, self.snakeSize))
+            pg.Rect(self.x, self.y, Constants.SNAKE_SIZE, Constants.SNAKE_SIZE))
 
         tail = self.snake.pop(0)
 
         updatable = [self.snake[-1], tail]
-
-        # toroidal movement
-        self.x = (self.x + self.dx) % self.screenW
-        self.y = (self.y + self.dy) % self.screenH
 
         grow = False
 
         # eats food
         if self.snake[-1].colliderect(self.food):
             old = self.food.copy()
-            x = random.randint(0, self.screenW - self.snakeSize)
-            y = random.randint( 0, self.screenH - self.snakeSize)
+            x = random.randint(0, Constants.SCREEN_W - Constants.FOOD_SIZE)
+            y = random.randint(0, Constants.SCREEN_H - Constants.FOOD_SIZE)
             self.food.x = x
             self.food.y = y
             updatable.append(self.food)
             updatable.append(old)
-            self.window.fill(self.backGroundColor, old)
+            if not virtual:
+                window.fill(Constants.BACKGROUND_COLOR, old)
 
             grow = True
         # tail growing
         if grow:
             self.snake.insert(0, tail)
         else:
-            self.window.fill(self.backGroundColor, tail)
+            if not virtual:
+                window.fill(Constants.BACKGROUND_COLOR, tail)
 
         # head touches tail
         head = self.snake[-1]
@@ -129,53 +98,135 @@ class Snake:
             if head.collidepoint(piece.centerx, piece.centery):
                 self.running = False
 
-        return updatable
+        return updatable, grow
 
-    def move(self):
+    def handleEvent(self, event):
+        if event.type == pg.QUIT or (event.type == pg.KEYDOWN and event.key == pg.K_ESCAPE):
+            self.running = False
+            return
+        elif not self.autopilot and event.type == pg.KEYDOWN:
+            if event.key == pg.K_RIGHT:
+                self.dx = Constants.SPEED
+                self.dy = 0
+            elif event.key == pg.K_LEFT:
+                self.dx = -Constants.SPEED
+                self.dy = 0
+            elif event.key == pg.K_DOWN:
+                self.dy = Constants.SPEED
+                self.dx = 0
+            elif event.key == pg.K_UP:
+                self.dy = -Constants.SPEED
+                self.dx = 0
+
+
+class Snake:
+    def __init__(self):
+        self.state = State(
+            100, 100, 0, Constants.SPEED, True, False,
+            [pg.Rect(100, 100, Constants.SNAKE_SIZE, Constants.SNAKE_SIZE)],
+            pg.Rect(50, 50, Constants.FOOD_SIZE, Constants.FOOD_SIZE)
+        )
+        self.window = None
+
+    def processInput(self):
+        for event in pg.event.get():
+            self.state.handleEvent(event)
+
+            if event.type == pg.MOUSEBUTTONDOWN:
+                x, y = pg.mouse.get_pos()
+                if self.autopilotButton.collidepoint(x, y):
+                    if self.state.autopilot:
+                        self.state.autopilot = False
+                    else:
+                        self.state.autopilot = True
+
+    def initialize(self):
+        pg.init()
+        pg.display.set_caption("Snake game")
+
+        self.window = pg.display.set_mode(
+            (Constants.SCREEN_W, Constants.SCREEN_H + Constants.CONTROLBOX_HEIGHT))
+        pg.draw.rect(self.window, Constants.BACKGROUND_COLOR,
+                     (0, 0, Constants.SCREEN_W, Constants.SCREEN_H))
+
+        font = pg.font.SysFont(None, 24)
+        img = font.render("Autopilot", True, Constants.CONTROLBOX_TEXT_COLOR)
+
+        controlBoxRec = (0, Constants.SCREEN_H,
+                         Constants.SCREEN_W, Constants.CONTROLBOX_HEIGHT)
+        pg.draw.rect(self.window, Constants.CONTROL_BOX_COLOR, controlBoxRec)
+        self.autopilotButton = pg.draw.rect(
+            self.window, Constants.AUTOPILOT_BUTTON_COLOR, (0, Constants.SCREEN_H, img.get_width(), Constants.CONTROLBOX_HEIGHT))
+
+        self.window.blit(
+            img, (0, Constants.SCREEN_H + Constants.CONTROLBOX_HEIGHT // 2 - 12))
+
+        pg.display.flip()
+
+    def eatsOwnTail(self, nextState):
+        head = nextState.snake[-1]
+        for piece in nextState.snake[:-1]:
+            if piece.colliderect(head):
+                return True
+        return False
+
+    def getScore(self, nextState):
+        score = (nextState.food.x - nextState.x)**2 + \
+            (nextState.food.y - nextState.y)**2
+        return score
+
+    def getBest(self, scores):
+        best = scores[0]
+        for score, move, steps in scores:
+            if score < best[0]:
+                best = (score, move, steps)
+            elif score == best[0]:
+                if steps < best[2]:
+                    best = (score, move, steps)
+
+        return best
+
+    def nextMove(self, state: State, stepsTaken: int, maxSteps: int) -> Tuple[int, Tuple[int, int], int]:
         """
-        More towards food if possible
+        Deside next move based on calculating outcome after certain number of steps
+        - if food is been eaten stops as it's not possible to predict the next location of 
+        randomly relocated food
+        - stops stepping if hits own tail
+        Returns:
+            (score, (dx,dy), stepsTaken)
         """
-        dest_x = self.food.x
-        dest_y = self.food.y
+        possible_moves = ((-Constants.SPEED, 0), (Constants.SPEED, 0),
+                          (0, Constants.SPEED), (0, -Constants.SPEED))
 
-        def eatsOwnTail(x, y):
-            futureHead = pg.Rect(x, y, self.snakeSize, self.snakeSize)
-            for rect in self.snake:
-                if futureHead.collidepoint(rect.centerx, rect.centery):
-                    return True
+        scores = []
+        for dx, dy in possible_moves:
+            move = (dx, dy)
+            nextState = state.copy()
+            nextState.dx = dx
+            nextState.dy = dy
+            _, grow = nextState.update(self.window, True)
 
-            return False
+            if self.eatsOwnTail(nextState):
+                scores.append((math.inf, move, stepsTaken))
+            elif grow:
+                scores.append((0, move, stepsTaken))
+            elif stepsTaken >= maxSteps:
+                scores.append((self.getScore(nextState), move, stepsTaken))
+            else:
+                score, _, steps = self.nextMove(
+                    nextState, stepsTaken+1, maxSteps)
+                scores.append((score, move, steps))
 
-        def getScore(x, y):
-            if eatsOwnTail(x, y):
-                return math.inf
-            score = (dest_x - x)**2 + (dest_y - y)**2
-            return score
-
-        possible_moves = [(-self.speed, 0), (self.speed, 0),
-                          (0, self.speed), (0, -self.speed)]
-        scores = [getScore(self.x + dx, self.y + dy)
-                  for dx, dy in possible_moves]
-
-        lowestScore = scores[0]
-        bestMove = possible_moves[0]
-
-        for i in range(1, len(scores)):
-            if scores[i] < lowestScore:
-                lowestScore = scores[i]
-                bestMove = possible_moves[i]
-
-        self.dx = bestMove[0]
-        self.dy = bestMove[1]
+        return self.getBest(scores)
 
     def render(self, updatable):
         # draw snake
-        for rec in self.snake:
-            pg.draw.rect(self.window, self.snakeColor, rec)
+        for rec in self.state.snake:
+            pg.draw.rect(self.window, Constants.SNAKE_COLOR, rec)
 
         # draw food
-        rec = pg.draw.circle(self.window, self.foodColor,
-                                self.food.center, self.food.w // 2)
+        rec = pg.draw.circle(self.window, Constants.FOOD_COLOR,
+                             self.state.food.center, self.state.food.w // 2)
         updatable.append(rec)
 
         # redraw updated parts of the screen that have changed
@@ -184,14 +235,15 @@ class Snake:
     def startGame(self):
         self.initialize()
         clock = pg.time.Clock()
-        while self.running:
-            if self.autopilot:
-                self.move()
+        while self.state.running:
+            if self.state.autopilot:
+                (_, (dx, dy), _) = self.nextMove(self.state, 0, Constants.STEPS_TO_TAKE)
+                self.state.dx = dx
+                self.state.dy = dy
 
             self.processInput()
-            updatable = self.update()
+            updatable, _ = self.state.update(self.window, False)
             self.render(updatable)
-
             clock.tick(10)
 
         # wait a second so you can see your failure >:)
