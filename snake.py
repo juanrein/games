@@ -4,16 +4,16 @@ Snake game with autopilot option
 @date 24.12.2020
 """
 
-import pygame as pg
 import random
 import math
 from typing import Tuple
+import pygame as pg
 
 
 class Constants:
     SNAKE_SIZE = 25
     SPEED = 25
-    FOOD_SIZE = 30
+    FOOD_SIZE = 25
 
     BACKGROUND_COLOR = (255, 255, 255)
     SNAKE_COLOR = (79, 204, 67)
@@ -26,6 +26,7 @@ class Constants:
     SCREEN_H = 500
 
     STEPS_TO_TAKE = 4
+
 
 class State:
     def __init__(self, x, y, dx, dy, running, autopilot, snake, food):
@@ -53,7 +54,7 @@ class State:
         Moves food if eaten
         Grows snake if eats food
         Checks if head touches tail
-        Params: 
+        Params:
             window: Surface
             virtual: whether to update window
         Returns:
@@ -75,10 +76,13 @@ class State:
         # eats food
         if self.snake[-1].colliderect(self.food):
             old = self.food.copy()
-            x = random.randint(0, Constants.SCREEN_W - Constants.FOOD_SIZE)
-            y = random.randint(0, Constants.SCREEN_H - Constants.FOOD_SIZE)
-            self.food.x = x
-            self.food.y = y
+            #x = random.randint(0, Constants.SCREEN_W - Constants.FOOD_SIZE)
+            #y = random.randint(0, Constants.SCREEN_H - Constants.FOOD_SIZE)
+            pos = self.generatePosition()
+            if not pos:
+                self.running = False
+            self.food.x = pos[0]
+            self.food.y = pos[1]
             updatable.append(self.food)
             updatable.append(old)
             if not virtual:
@@ -118,6 +122,27 @@ class State:
                 self.dy = -Constants.SPEED
                 self.dx = 0
 
+    def generatePosition(self):
+        """
+        Generate new position for the food that doesn't have snake in it
+        Returns:
+            (x,y) | None if no free cells left
+        """
+        w, h = Constants.SCREEN_W, Constants.SCREEN_H
+        columns, rows = w // Constants.FOOD_SIZE, h // Constants.FOOD_SIZE
+        freeCells = []
+        for row in range(rows):
+            for col in range(columns):
+                x, y = row * Constants.FOOD_SIZE, col * Constants.FOOD_SIZE
+                cell = pg.Rect(x, y, Constants.FOOD_SIZE, Constants.FOOD_SIZE)
+                if cell.collidelist(self.snake) == -1:
+                    freeCells.append(cell)
+
+        if len(freeCells) == 0:
+            return None
+
+        return random.choice(freeCells)
+
 
 class Snake:
     def __init__(self):
@@ -127,6 +152,7 @@ class Snake:
             pg.Rect(50, 50, Constants.FOOD_SIZE, Constants.FOOD_SIZE)
         )
         self.window = None
+        self.autopilotButton = None
 
     def processInput(self):
         for event in pg.event.get():
@@ -156,7 +182,8 @@ class Snake:
                          Constants.SCREEN_W, Constants.CONTROLBOX_HEIGHT)
         pg.draw.rect(self.window, Constants.CONTROL_BOX_COLOR, controlBoxRec)
         self.autopilotButton = pg.draw.rect(
-            self.window, Constants.AUTOPILOT_BUTTON_COLOR, (0, Constants.SCREEN_H, img.get_width(), Constants.CONTROLBOX_HEIGHT))
+            self.window, Constants.AUTOPILOT_BUTTON_COLOR,
+                (0, Constants.SCREEN_H, img.get_width(), Constants.CONTROLBOX_HEIGHT))
 
         self.window.blit(
             img, (0, Constants.SCREEN_H + Constants.CONTROLBOX_HEIGHT // 2 - 12))
@@ -186,10 +213,11 @@ class Snake:
 
         return best
 
-    def nextMove(self, state: State, stepsTaken: int, maxSteps: int) -> Tuple[int, Tuple[int, int], int]:
+    def nextMove(self, state: State, stepsTaken: int, maxSteps: int) -> \
+        Tuple[int, Tuple[int, int], int]:
         """
         Deside next move based on calculating outcome after certain number of steps
-        - if food is been eaten stops as it's not possible to predict the next location of 
+        - if food is been eaten stops as it's not possible to predict the next location of
         randomly relocated food
         - stops stepping if hits own tail
         Returns:
@@ -237,7 +265,8 @@ class Snake:
         clock = pg.time.Clock()
         while self.state.running:
             if self.state.autopilot:
-                (_, (dx, dy), _) = self.nextMove(self.state, 0, Constants.STEPS_TO_TAKE)
+                (_, (dx, dy), _) = self.nextMove(
+                    self.state, 0, Constants.STEPS_TO_TAKE)
                 self.state.dx = dx
                 self.state.dy = dy
 
@@ -246,7 +275,6 @@ class Snake:
             self.render(updatable)
             clock.tick(10)
 
-        # wait a second so you can see your failure >:)
         pg.time.wait(1000)
         pg.quit()
 
