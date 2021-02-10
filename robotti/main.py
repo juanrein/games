@@ -1,10 +1,11 @@
 """
-Cannon shooting cannonballs
+Cleaning robot moving through house cleaning
+@author Juha Reinikainen
+@date 10.2.2021
 """
 
-import pygame as pg
-import random
 import os
+import pygame as pg
 
 class House:
     def __init__(self):
@@ -42,7 +43,7 @@ class Robot:
             moves.append((x,y,self.visited[y][x]))
 
         moves = sorted(moves, key = lambda x: x[2])
-        x,y,score = moves[0]
+        x,y,_ = moves[0]
         self.x = x
         self.y = y
 
@@ -56,6 +57,7 @@ class Sim:
 
         self.robot = None
         self.house = None
+        self.blockSize = None
 
     def initialize(self):
         pg.init()
